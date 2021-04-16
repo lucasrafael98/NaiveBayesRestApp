@@ -20,6 +20,7 @@ namespace PriberamRestApp.Classification
 
         public enum Topic
         {
+            None,
             business,
             entertainment,
             politics,
@@ -28,7 +29,7 @@ namespace PriberamRestApp.Classification
         }
 
         // This value is used for cases when a word being tested isn't in training data.
-        private static float NotTrainedLikelihood = 1e-2f;
+        private static float NotTrainedProbability = 1e-2f;
 
         // A list of frequency dictionaries for each topic.
         // The dictionary key is each word, and the list contained stores
@@ -102,7 +103,10 @@ namespace PriberamRestApp.Classification
          */
         public Topic Classify(TestDocument document)
         {
-            List<double> probabilities = new();
+            Topic classifiedTopic = Topic.None;
+            double maxProbability = 0.0;
+            double currentProbability = 1.0;
+
             String[] words = document.Text.Split(
                 new char[] { '.', '?', '!', ' ', ';', ':', ',', '-', '"' },
                 StringSplitOptions.RemoveEmptyEntries
@@ -110,12 +114,28 @@ namespace PriberamRestApp.Classification
 
             foreach (int topic in Enum.GetValues(typeof(Topic)))
             {
+                // skipping the first topic, as it's just there as a default value.
+                if (topic == 0)
+                {
+                    continue;
+                }
                 foreach(String word in words)
                 {
-
+                    if (Frequencies[topic].ContainsKey(word))
+                    {
+                        currentProbability *= Frequencies[topic][word][2];
+                    } else
+                    {
+                        currentProbability *= NotTrainedProbability;
+                    }
+                }
+                if(currentProbability > maxProbability)
+                {
+                    maxProbability = currentProbability;
+                    classifiedTopic = (Topic)topic;
                 }
             }
-            return Topic.business;
+            return classifiedTopic;
         }
 
     }

@@ -50,7 +50,9 @@ namespace PriberamRestApp.Controllers
             _context.TestDocuments.Add(testDocument);
             await _context.SaveChangesAsync();
 
-            return Ok();
+            Classifier.Topic result = Classifier.Instance.Classify(testDocument);
+
+            return Ok(result.ToString());
         }
 
         private bool TestDocumentExists(long id)
