@@ -6,10 +6,11 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PriberamRestApp.Models;
+using PriberamRestApp.Classification;
 
 namespace PriberamRestApp.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("api/training/document")]
     [ApiController]
     public class TrainingDocumentsController : ControllerBase
     {
@@ -20,14 +21,14 @@ namespace PriberamRestApp.Controllers
             _context = context;
         }
 
-        // GET: api/TrainingDocuments
+        // GET: api/training/document
         [HttpGet]
         public async Task<ActionResult<IEnumerable<TrainingDocument>>> GetDocuments()
         {
             return await _context.TrainingDocuments.ToListAsync();
         }
 
-        // GET: api/TrainingDocuments/5
+        // GET: api/training/document/{id}
         [HttpGet("{id}")]
         public async Task<ActionResult<TrainingDocument>> GetTrainingDocument(long id)
         {
@@ -41,38 +42,7 @@ namespace PriberamRestApp.Controllers
             return trainingDocument;
         }
 
-        // PUT: api/TrainingDocuments/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutTrainingDocument(long id, TrainingDocument trainingDocument)
-        {
-            if (id != trainingDocument.Id)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(trainingDocument).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!TrainingDocumentExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
-        }
-
-        // POST: api/TrainingDocuments
+        // POST: api/training/document
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
         public async Task<ActionResult<TrainingDocument>> PostTrainingDocument(TrainingDocument trainingDocument)
@@ -80,23 +50,9 @@ namespace PriberamRestApp.Controllers
             _context.TrainingDocuments.Add(trainingDocument);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetTrainingDocument", new { id = trainingDocument.Id }, trainingDocument);
-        }
+            Classifier.Instance.Train(trainingDocument);
 
-        // DELETE: api/TrainingDocuments/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteTrainingDocument(long id)
-        {
-            var trainingDocument = await _context.TrainingDocuments.FindAsync(id);
-            if (trainingDocument == null)
-            {
-                return NotFound();
-            }
-
-            _context.TrainingDocuments.Remove(trainingDocument);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            return Ok();
         }
 
         private bool TrainingDocumentExists(long id)

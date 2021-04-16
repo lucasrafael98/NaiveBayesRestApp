@@ -6,10 +6,11 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PriberamRestApp.Models;
+using PriberamRestApp.Classification;
 
 namespace PriberamRestApp.Controllers
 {
-    [Route("api/[controller]")]
+    [Route("api/test/document")]
     [ApiController]
     public class TestDocumentsController : ControllerBase
     {
@@ -20,14 +21,14 @@ namespace PriberamRestApp.Controllers
             _context = context;
         }
 
-        // GET: api/TestDocuments
+        // GET: api/test/document
         [HttpGet]
         public async Task<ActionResult<IEnumerable<TestDocument>>> GetTestDocuments()
         {
             return await _context.TestDocuments.ToListAsync();
         }
 
-        // GET: api/TestDocuments/5
+        // GET: api/test/document/{id}
         [HttpGet("{id}")]
         public async Task<ActionResult<TestDocument>> GetTestDocument(long id)
         {
@@ -41,38 +42,7 @@ namespace PriberamRestApp.Controllers
             return testDocument;
         }
 
-        // PUT: api/TestDocuments/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutTestDocument(long id, TestDocument testDocument)
-        {
-            if (id != testDocument.Id)
-            {
-                return BadRequest();
-            }
-
-            _context.Entry(testDocument).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!TestDocumentExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
-        }
-
-        // POST: api/TestDocuments
+        // POST: api/test/document
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
         public async Task<ActionResult<TestDocument>> PostTestDocument(TestDocument testDocument)
@@ -80,23 +50,7 @@ namespace PriberamRestApp.Controllers
             _context.TestDocuments.Add(testDocument);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction("GetTestDocument", new { id = testDocument.Id }, testDocument);
-        }
-
-        // DELETE: api/TestDocuments/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteTestDocument(long id)
-        {
-            var testDocument = await _context.TestDocuments.FindAsync(id);
-            if (testDocument == null)
-            {
-                return NotFound();
-            }
-
-            _context.TestDocuments.Remove(testDocument);
-            await _context.SaveChangesAsync();
-
-            return NoContent();
+            return Ok();
         }
 
         private bool TestDocumentExists(long id)

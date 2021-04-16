@@ -9,15 +9,15 @@
     }
   },
   "profiles": {
-    "IIS Express": {
+    "PriberamRestApp": {
       "commandName": "IISExpress",
       "launchBrowser": true,
-      "launchUrl": "api/classify",
+      "launchUrl": "api",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
     },
-    "PriberamRestApp": {
+    "PRA": {
       "commandName": "Project",
       "dotnetRunMessages": "true",
       "launchBrowser": true,
