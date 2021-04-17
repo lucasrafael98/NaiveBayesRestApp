@@ -21,10 +21,6 @@ namespace PriberamRestApp
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddDbContext<TestContext>(opt =>
-                                               opt.UseInMemoryDatabase("TestList"));
-            services.AddDbContext<TrainingContext>(opt =>
-                                               opt.UseInMemoryDatabase("TrainingList"));
             services.AddControllers();
         }
 
