@@ -59,7 +59,7 @@ namespace PriberamRestApp.Controllers
             }
             else
             {
-                return Ok(result.ToString());
+                return Ok(new Topic(resultingTopic.ToString()));
             }
         }
 
