@@ -42,19 +42,41 @@ namespace PriberamRestApp.Controllers
             return trainingDocument;
         }
 
-        // POST: api/training/document
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        //// POST: api/training/document
+        //// To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
+        //[HttpPost]
+        //public async Task<ActionResult<TrainingDocument>> PostTrainingDocument(TrainingDocument trainingDocument)
+        //{
+        //    _context.TrainingDocuments.Add(trainingDocument);
+        //    await _context.SaveChangesAsync();
+
+        //    try
+        //    {
+        //        Classifier.Instance.Train(trainingDocument);
+        //        return Ok();
+        //    } catch(Exception e)
+        //    {
+        //        Console.WriteLine(e.Message);
+        //        return StatusCode(500);
+        //    }
+
+        //}
+
         [HttpPost]
-        public async Task<ActionResult<TrainingDocument>> PostTrainingDocument(TrainingDocument trainingDocument)
+        public async Task<ActionResult<TrainingDocument[]>> PostTrainingDocuments(TrainingDocument[] trainingDocuments)
         {
-            _context.TrainingDocuments.Add(trainingDocument);
-            await _context.SaveChangesAsync();
+            //_context.TrainingDocuments.Add(trainingDocument);
+            //await _context.SaveChangesAsync();
 
             try
             {
-                Classifier.Instance.Train(trainingDocument);
+                foreach(TrainingDocument trainingDocument in trainingDocuments)
+                {
+                    Classifier.Instance.Train(trainingDocument);
+                }
                 return Ok();
-            } catch(Exception e)
+            }
+            catch (Exception e)
             {
                 Console.WriteLine(e.Message);
                 return StatusCode(500);

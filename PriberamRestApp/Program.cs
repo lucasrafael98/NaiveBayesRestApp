@@ -19,8 +19,8 @@ namespace PriberamRestApp
 
         public static void Main(string[] args)
         {
-            CreateHostBuilder(args).Build().Run();
             AppDomain.CurrentDomain.ProcessExit += new EventHandler(OnProcessExit);
+            CreateHostBuilder(args).Build().Run();
         }
 
         public static IHostBuilder CreateHostBuilder(string[] args) =>

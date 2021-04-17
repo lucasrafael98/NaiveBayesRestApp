@@ -27,12 +27,13 @@ namespace PriberamRestApp.Classification
             business,
             entertainment,
             politics,
-            sports,
+            sport,
             tech
         }
 
         // This value is used for cases when a word being tested isn't in training data.
-        private const float NotTrainedProbability = 1e-2f;
+        // (It corresponds to log(1e-2). Please check the description for ClassifyAsync().)
+        private const float NotTrainedProbability = -2f;
         // When the application exits, the classifier state (Frequencies) is saved in this file.
         private const String SaveFileName = "frequencies.json";
 
@@ -62,18 +63,24 @@ namespace PriberamRestApp.Classification
             Dictionary<String, int> wordOccurrences = new();
 
             String[] words = text.Split(
-                new char[] { '.', '?', '!', ' ', ';', ':', ',', '-', '"', '\n' },
+                new char[] { '.', '?', '!', ' ', ';', ':', ',', '-', '\"', '\n', '\\' },
                 StringSplitOptions.RemoveEmptyEntries
             );
 
             foreach (String word in words)
             {
-                if (wordOccurrences.ContainsKey(word))
+                // Naturally, "Search" and "search" shouldn't be considered different words.
+                String wordLowerCase = word.ToLower();
+                // Stop word removal
+                if(StopWords.StopWordDictionary.ContainsKey(wordLowerCase)){
+                    continue;
+                }
+                if (wordOccurrences.ContainsKey(wordLowerCase))
                 {
-                    wordOccurrences[word] += 1;
+                    wordOccurrences[wordLowerCase] += 1;
                 } else
                 {
-                    wordOccurrences[word] = 1;
+                    wordOccurrences[wordLowerCase] = 1;
                 }
             }
 
@@ -100,7 +107,7 @@ namespace PriberamRestApp.Classification
                         Frequencies[topic][item.Key].FrequencyTotal += item.Value;
                         Frequencies[topic][item.Key].FrequencyPerDocument += 1;
                         Frequencies[topic][item.Key].Occurrence
-                            = Frequencies[topic][item.Key].FrequencyPerDocument
+                            = (float) Frequencies[topic][item.Key].FrequencyPerDocument
                             / DocumentsTrained[topic];
                     }
                     else
@@ -114,15 +121,23 @@ namespace PriberamRestApp.Classification
 
         /*
          * Classifies the given document, returning a topic.
+         * 
+         * Instead of multiplying the probabilities for each word
+         * (which is very likely to lead to floating-point underflow, 
+         * and does so in the example dataset) we apply a logarithm to 
+         * each multiplication, turning a product operation into a 
+         * sum and avoiding underflow.
          */
         public Task<Topic> ClassifyAsync(TestDocument document)
         {
             Topic classifiedTopic = Topic.None;
-            double maxProbability = 0.0;
-            double currentProbability = 1.0;
+            // Since we're using sums of logarithms, the "probability"
+            // is likely negative, and certainly not between 0 and 1.
+            double maxProbability = double.MinValue;
+            double currentProbability;
 
             String[] words = document.Text.Split(
-                new char[] { '.', '?', '!', ' ', ';', ':', ',', '-', '"' },
+                new char[] { '.', '?', '!', ' ', ';', ':', ',', '-', '\"', '\n', '\\' },
                 StringSplitOptions.RemoveEmptyEntries
             );
 
@@ -133,14 +148,15 @@ namespace PriberamRestApp.Classification
                 {
                     continue;
                 }
+                currentProbability = 1.0;
                 foreach(String word in words)
                 {
                     if (Frequencies[topic].ContainsKey(word))
                     {
-                        currentProbability *= Frequencies[topic][word].Occurrence;
+                        currentProbability += Math.Log(Frequencies[topic][word].Occurrence);
                     } else
                     {
-                        currentProbability *= NotTrainedProbability;
+                        currentProbability += NotTrainedProbability;
                     }
                 }
                 if(currentProbability > maxProbability)
