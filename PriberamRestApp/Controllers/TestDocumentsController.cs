@@ -50,9 +50,17 @@ namespace PriberamRestApp.Controllers
             _context.TestDocuments.Add(testDocument);
             await _context.SaveChangesAsync();
 
-            Classifier.Topic result = Classifier.Instance.Classify(testDocument);
+            Task<Classifier.Topic> result = Classifier.Instance.ClassifyAsync(testDocument);
+            Classifier.Topic resultingTopic = await result;
 
-            return Ok(result.ToString());
+            if(resultingTopic == Classifier.Topic.None)
+            {
+                return StatusCode(500);
+            }
+            else
+            {
+                return Ok(result.ToString());
+            }
         }
 
         private bool TestDocumentExists(long id)

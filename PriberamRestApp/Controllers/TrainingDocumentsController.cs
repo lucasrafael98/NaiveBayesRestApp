@@ -50,9 +50,16 @@ namespace PriberamRestApp.Controllers
             _context.TrainingDocuments.Add(trainingDocument);
             await _context.SaveChangesAsync();
 
-            Classifier.Instance.Train(trainingDocument);
+            try
+            {
+                Classifier.Instance.Train(trainingDocument);
+                return Ok();
+            } catch(Exception e)
+            {
+                Console.WriteLine(e.Message);
+                return StatusCode(500);
+            }
 
-            return Ok();
         }
 
         private bool TrainingDocumentExists(long id)

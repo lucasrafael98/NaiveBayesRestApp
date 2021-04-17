@@ -3,6 +3,9 @@ using PriberamRestApp.Models;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.IO;
 
 namespace PriberamRestApp.Classification
 {
@@ -29,12 +32,15 @@ namespace PriberamRestApp.Classification
         }
 
         // This value is used for cases when a word being tested isn't in training data.
-        private static float NotTrainedProbability = 1e-2f;
+        private const float NotTrainedProbability = 1e-2f;
+        // When the application exits, the classifier state (Frequencies) is saved in this file.
+        private const String SaveFileName = "frequencies.json";
 
         // A list of frequency dictionaries for each topic.
-        // The dictionary key is each word, and the list contained stores
-        // three integers: frequency total, frequency per document, and occurrence.
-        private List<Dictionary<String, List<float>>> Frequencies = new();
+        // The dictionary key is each word.
+        private List<Dictionary<String, Frequency>> Frequencies = new();
+        // Having a list of locks for each separate dictionary allows us to train different topics concurrently.
+        private List<object> FrequencyLocks = new List<object>();
         private List<int> DocumentsTrained = new();
 
         private Classifier()
@@ -42,17 +48,21 @@ namespace PriberamRestApp.Classification
             // Creating a dictionary for this topic. 
             // This is done as such in order to allow for any number of new topics to be added.
             foreach(Topic topic in Enum.GetValues(typeof(Topic))){
-                Frequencies.Add(new Dictionary<string, List<float>>());
+                Frequencies.Add(new Dictionary<string, Frequency>());
+                FrequencyLocks.Add(new object());
                 DocumentsTrained.Add(0);
             }
         }
 
+        /*
+         * Returns a frequency dictionary for a single document.
+         */
         private Dictionary<String, int> CountWordOccurrences(String text)
         {
             Dictionary<String, int> wordOccurrences = new();
 
             String[] words = text.Split(
-                new char[] { '.', '?', '!', ' ', ';', ':', ',', '-', '"' },
+                new char[] { '.', '?', '!', ' ', ';', ':', ',', '-', '"', '\n' },
                 StringSplitOptions.RemoveEmptyEntries
             );
 
@@ -80,28 +90,32 @@ namespace PriberamRestApp.Classification
             int topic = (int) Enum.Parse(typeof(Topic), document.Topic);
 
             Dictionary<String, int> wordOccurrences = CountWordOccurrences(document.Text);
-
-            DocumentsTrained[topic] += 1;
-            foreach (var item in wordOccurrences)
+            lock (FrequencyLocks[topic])
             {
-                if (Frequencies[topic].ContainsKey(item.Key)) {
-                    Frequencies[topic][item.Key][0] += item.Value;
-                    Frequencies[topic][item.Key][1] += 1;
-                    Frequencies[topic][item.Key][2] = Frequencies[topic][item.Key][1] / DocumentsTrained[topic];
-                } else
+                DocumentsTrained[topic] += 1;
+                foreach (var item in wordOccurrences)
                 {
-                    Frequencies[topic][item.Key] = new List<float>();
-                    Frequencies[topic][item.Key].Add(item.Value);
-                    Frequencies[topic][item.Key].Add(1);
-                    Frequencies[topic][item.Key].Add(1.0f);
+                    if (Frequencies[topic].ContainsKey(item.Key))
+                    {
+                        Frequencies[topic][item.Key].FrequencyTotal += item.Value;
+                        Frequencies[topic][item.Key].FrequencyPerDocument += 1;
+                        Frequencies[topic][item.Key].Occurrence
+                            = Frequencies[topic][item.Key].FrequencyPerDocument
+                            / DocumentsTrained[topic];
+                    }
+                    else
+                    {
+                        Frequencies[topic][item.Key] = new Frequency(item.Value, 1, 1.0);
+                    }
                 }
             }
+
         }
 
         /*
          * Classifies the given document, returning a topic.
          */
-        public Topic Classify(TestDocument document)
+        public Task<Topic> ClassifyAsync(TestDocument document)
         {
             Topic classifiedTopic = Topic.None;
             double maxProbability = 0.0;
@@ -123,7 +137,7 @@ namespace PriberamRestApp.Classification
                 {
                     if (Frequencies[topic].ContainsKey(word))
                     {
-                        currentProbability *= Frequencies[topic][word][2];
+                        currentProbability *= Frequencies[topic][word].Occurrence;
                     } else
                     {
                         currentProbability *= NotTrainedProbability;
@@ -135,8 +149,14 @@ namespace PriberamRestApp.Classification
                     classifiedTopic = (Topic)topic;
                 }
             }
-            return classifiedTopic;
+            return Task.FromResult(classifiedTopic);
         }
 
+        public void SaveClassifierState()
+        {
+            String frequencyString = JsonSerializer.Serialize(Frequencies);
+            File.WriteAllText(SaveFileName, frequencyString);
+        }
     }
+
 }
