@@ -22,7 +22,7 @@ namespace PriberamRestApp.Controllers
         public async Task<ActionResult<TestDocument>> PostTestDocument(TestDocument testDocument)
         {
 
-            Task<Classifier.Topic> result = Classifier.Instance.ClassifyAsync(testDocument);
+            Task<Classifier.Topic> result = Classifier.Instance.ClassifyAsync(testDocument.Text);
             Classifier.Topic resultingTopic = await result;
 
             if(resultingTopic == Classifier.Topic.None)

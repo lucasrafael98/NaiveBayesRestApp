@@ -22,7 +22,7 @@ namespace PriberamRestApp.Controllers
         {
             try
             {
-                Classifier.Instance.Train(trainingDocument);
+                Classifier.Instance.Train(trainingDocument.Text, trainingDocument.Topic);
                 return Ok();
             }
             catch (Exception e)

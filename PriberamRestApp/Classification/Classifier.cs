@@ -1,9 +1,8 @@
 ﻿using System;
-using PriberamRestApp.Models;
 using System.Collections.Generic;
+using System.Threading;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Text.Json;
 using System.IO;
 using GroBuf;
 using GroBuf.DataMembersExtracters;
@@ -45,21 +44,22 @@ namespace PriberamRestApp.Classification
         // The dictionary key is each word.
         private List<Dictionary<String, Frequency>> Frequencies = new();
 
-        // Having a list of locks for each separate dictionary allows us to train different topics concurrently.
-        private List<object> FrequencyLocks = new List<object>();
+        private object FrequencyLock = new object();
         private List<int> DocumentsTrained = new();
 
         // Serializer used to keep the classifier state even if the program shuts down arbitrarily
         // (from https://www.nuget.org/packages/GroBuf/1.7.3)
         private Serializer serializer = new Serializer(new PropertiesExtractor(), options: GroBufOptions.WriteEmptyObjects);
+        private Timer timer;
 
         private Classifier()
         {
+            // We save the system state every 10 seconds.
+            timer = new Timer(SaveClassifierState, null, 10000, 10000);
             // Creating a dictionary for this topic. 
             // This is done as such in order to allow for any number of new topics to be added.
-            foreach(Topic topic in Enum.GetValues(typeof(Topic))){
+            foreach (Topic topic in Enum.GetValues(typeof(Topic))){
                 Frequencies.Add(new Dictionary<string, Frequency>());
-                FrequencyLocks.Add(new object());
                 DocumentsTrained.Add(0);
             }
             // Checking if there's an existing save state for the classifier. If so, it's deserialized.
@@ -111,12 +111,12 @@ namespace PriberamRestApp.Classification
          * At the end we serialize the current classifier state so that 
          * in case of a shutdown, the classifier retains its state.
          */
-        public void Train(TrainingDocument document)
+        public void Train(String document, String topicName)
         {
-            int topic = (int) Enum.Parse(typeof(Topic), document.Topic);
+            int topic = (int) Enum.Parse(typeof(Topic), topicName);
 
-            Dictionary<String, int> wordOccurrences = CountWordOccurrences(document.Text);
-            lock (FrequencyLocks[topic])
+            Dictionary<String, int> wordOccurrences = CountWordOccurrences(document);
+            lock (FrequencyLock)
             {
                 DocumentsTrained[topic] += 1;
                 foreach (var item in wordOccurrences)
@@ -134,7 +134,6 @@ namespace PriberamRestApp.Classification
                         Frequencies[topic][item.Key] = new Frequency(item.Value, 1, 1.0);
                     }
                 }
-                SaveClassifierState();
             }
 
         }
@@ -148,7 +147,7 @@ namespace PriberamRestApp.Classification
          * each multiplication, turning a product operation into a 
          * sum and avoiding underflow.
          */
-        public Task<Topic> ClassifyAsync(TestDocument document)
+        public Task<Topic> ClassifyAsync(String document)
         {
             Topic classifiedTopic = Topic.None;
             // Since we're using sums of logarithms, the "probability"
@@ -156,7 +155,7 @@ namespace PriberamRestApp.Classification
             double maxProbability = double.MinValue;
             double currentProbability;
 
-            String[] words = document.Text.Split(
+            String[] words = document.Split(
                 new char[] { '.', '?', '!', ' ', ';', ':', ',', '-', '\"', '\n', '\\' },
                 StringSplitOptions.RemoveEmptyEntries
             );
@@ -191,9 +190,14 @@ namespace PriberamRestApp.Classification
         /*
          * Serializes the current classifier state and writes the byte buffer to a file.
          */
-        public void SaveClassifierState()
+        public void SaveClassifierState(object state)
         {
-            byte[] data = serializer.Serialize(Frequencies);
+            byte[] data;
+            // lock used to avoid having the frequencies being overwritten mid-serializing
+            lock (FrequencyLock)
+            {
+                data = serializer.Serialize(Frequencies);
+            }
             File.WriteAllBytes(SaveFileName, data);
         }
     }
