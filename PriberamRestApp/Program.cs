@@ -12,14 +12,9 @@ namespace PriberamRestApp
 {
     public class Program
     {
-        static void OnProcessExit(object sender, EventArgs e)
-        {
-            Classifier.Instance.SaveClassifierState();
-        }
 
         public static void Main(string[] args)
         {
-            AppDomain.CurrentDomain.ProcessExit += new EventHandler(OnProcessExit);
             CreateHostBuilder(args).Build().Run();
         }
 

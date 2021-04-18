@@ -4,15 +4,19 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.IO;
+using GroBuf;
+using GroBuf.DataMembersExtracters;
 
 namespace PriberamRestApp.Classification
 {
     public class Classifier
     {
         private static Classifier instance = new Classifier();
-
+        
+        // There should only be one classifier whose methods are
+        // accessed from different parts of the API, so we use
+        // a Singleton design pattern.
         public static Classifier Instance
         {
             get
@@ -35,14 +39,19 @@ namespace PriberamRestApp.Classification
         // (It corresponds to log(1e-2). Please check the description for ClassifyAsync().)
         private const float NotTrainedProbability = -2f;
         // When the application exits, the classifier state (Frequencies) is saved in this file.
-        private const String SaveFileName = "frequencies.json";
+        private const String SaveFileName = "frequencies.bin";
 
         // A list of frequency dictionaries for each topic.
         // The dictionary key is each word.
         private List<Dictionary<String, Frequency>> Frequencies = new();
+
         // Having a list of locks for each separate dictionary allows us to train different topics concurrently.
         private List<object> FrequencyLocks = new List<object>();
         private List<int> DocumentsTrained = new();
+
+        // Serializer used to keep the classifier state even if the program shuts down arbitrarily
+        // (from https://www.nuget.org/packages/GroBuf/1.7.3)
+        private Serializer serializer = new Serializer(new PropertiesExtractor(), options: GroBufOptions.WriteEmptyObjects);
 
         private Classifier()
         {
@@ -53,10 +62,18 @@ namespace PriberamRestApp.Classification
                 FrequencyLocks.Add(new object());
                 DocumentsTrained.Add(0);
             }
+            // Checking if there's an existing save state for the classifier. If so, it's deserialized.
+            if (File.Exists(SaveFileName))
+            {
+                Frequencies = serializer.Deserialize<List<Dictionary<String, Frequency>>>(File.ReadAllBytes(SaveFileName));
+            }
         }
 
         /*
          * Returns a frequency dictionary for a single document.
+         * 
+         * It starts by removing punctuation and stop words, and 
+         * only then does it count word occurrences.
          */
         private Dictionary<String, int> CountWordOccurrences(String text)
         {
@@ -91,6 +108,8 @@ namespace PriberamRestApp.Classification
          * Trains the classifier using the given document.
          * 
          * We update the frequencies of each word found in the given text.
+         * At the end we serialize the current classifier state so that 
+         * in case of a shutdown, the classifier retains its state.
          */
         public void Train(TrainingDocument document)
         {
@@ -115,6 +134,7 @@ namespace PriberamRestApp.Classification
                         Frequencies[topic][item.Key] = new Frequency(item.Value, 1, 1.0);
                     }
                 }
+                SaveClassifierState();
             }
 
         }
@@ -168,10 +188,13 @@ namespace PriberamRestApp.Classification
             return Task.FromResult(classifiedTopic);
         }
 
+        /*
+         * Serializes the current classifier state and writes the byte buffer to a file.
+         */
         public void SaveClassifierState()
         {
-            String frequencyString = JsonSerializer.Serialize(Frequencies);
-            File.WriteAllText(SaveFileName, frequencyString);
+            byte[] data = serializer.Serialize(Frequencies);
+            File.WriteAllBytes(SaveFileName, data);
         }
     }
 
